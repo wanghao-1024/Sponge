@@ -19,9 +19,9 @@
 
 /*
 
-0                4   5   6        8 (BYTE)
-+----------------+---+---+--------+ 
-|      conv      |cmd|frg| wnd    | 
+0                 4      5   6        8 (BYTE)
+-----------------+---+---+--------+ 
+|      conv                  |cmd |frg   | wnd    | 
 +----------------+----------------+ 8
 |      ts        |      sn        | 
 +----------------+----------------+ 16
@@ -733,6 +733,8 @@ static void ikcp_ack_push(ikcpcb *kcp, IUINT32 sn, IUINT32 ts)
         IUINT32 *acklist;
         size_t newblock;
 
+        // 每次扩容为原来的一倍
+        // 依次为8，16，32，64等
         for (newblock = 8; newblock < newsize; newblock <<= 1);
         acklist = (IUINT32 *)ikcp_malloc(newblock * sizeof(IUINT32) * 2);
 
@@ -759,7 +761,7 @@ static void ikcp_ack_push(ikcpcb *kcp, IUINT32 sn, IUINT32 ts)
 
     ptr = &kcp->acklist[kcp->ackcount * 2];
     ptr[0] = sn;    // 存储包的序号和发包时间
-    ptr[1] = ts;
+    ptr[1] = ts;    // 将发包时间回射回去，发送端用来计算rtt
     kcp->ackcount++;
 }
 
@@ -1082,6 +1084,9 @@ void ikcp_flush(ikcpcb *kcp)
     count = kcp->ackcount;
     for (i = 0; i < count; i++)     // 发送ack
     {
+        // 延迟ACK vs 非延迟ACK。延迟发送ack会导致计算出来的rtt偏大
+        // 在flush中发送ack，就是延迟发送ack，因为flush是按照一定时间间隔调用的
+
         size = (int)(ptr - buffer);
         if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu)
         {
@@ -1184,7 +1189,7 @@ void ikcp_flush(ikcpcb *kcp)
 
     // calculate resent
     resent = (kcp->fastresend > 0)? (IUINT32)kcp->fastresend : 0xffffffff;  // 快速重传
-    rtomin = (kcp->nodelay == 0)? (kcp->rx_rto >> 3) : 0;   // 延迟ACK vs 非延迟ACK。延迟发送ack会导致计算出来的rtt偏大
+    rtomin = (kcp->nodelay == 0)? (kcp->rx_rto >> 3) : 0;
 
     // flush data segments
     for (p = kcp->snd_buf.next; p != &kcp->snd_buf; p = p->next)

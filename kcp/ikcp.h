@@ -312,7 +312,7 @@ struct IKCPCB
     struct IQUEUEHEAD rcv_buf;      //根据接收窗口大小，将rcv_buf的数据包移动到rcv_queue
     IUINT32 *acklist;
     IUINT32 ackcount;               //收到数据包的个数，收到数据包要发ack，也就是待发送ack的个数
-    IUINT32 ackblock;
+    IUINT32 ackblock;    // acklist可以存储待回复ack信息的个数
     void *user;
     char *buffer;
     int fastresend;             //触发快速重传重复ack的个数
